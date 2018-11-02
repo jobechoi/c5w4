@@ -1,0 +1,131 @@
+---
+title: "Types of Major Weather Events and Storms, 1950-2011"
+output: html_document
+---
+The following analysis was conducted with data from the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. The analysis is a systematic exploration of major storm and weather events, recorded between 1950 and the later part of 2011.  
+  
+From this exploration, the analysis attempts to answer two questions:  
+  
+1. Across the United States, which types of weather or storm events were most harmful in respect to population health;  
+2. and, which types of events had the greatest economic consequences.  
+  
+In the Data Processing section of this analysis, a thorough description of how the data was loaded and processed is provided, from how the raw .csv file was loaded for analysis with R, to any transformations undertaken to prepare the data for the analysis phase. Included is how the compressed file containing the data was downloaded and then extracted to a .csv form. 
+  
+## Data Processing  
+```{r}
+options(scipen = 1, digits = 2)
+
+# Download .bz2 compressed file to current working directory
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2","stormy.bz2")
+
+# Read .csv file
+sd<-read.csv("stormy.bz2")
+
+```
+
+### Question: Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?  
+  
+We'll begin by understanding the structure of the data, here referenced as data frame sd.  
+  
+Of the over 30 variables, the analysis is only concerned with a handful:
+```{r}
+# Review structure
+str(sd)
+```
+  
+The structure function reveals two numeric vectors, FATALITIES and INJURIES. Assuming these are the number of occurrences of each for each EVTYPE-weather or storm event, we'll sum each vector and group them by EVTYPE, in pd.  
+```{r}
+pd<-aggregate(list(FATALITIES=sd$FATALITIES,INJURIES=sd$INJURIES),list(EVTYPE=sd$EVTYPE),sum)
+```
+  
+The final step is to sum the two numreric vectors together and put their total in a new vector, HARM, and plot the events that are most harmful to population health. The analysis considers population health as any value of HARM greater than 1 for a given event type.
+  
+```{r}
+pd$HARM<-pd$FATALITIES + pd$INJURIES
+```
+  
+For purpose of analysis, we further limit the observations of pd to the top 20 events types by HARM value, in plotme.
+  
+```{r}
+plotme<-pd[order(pd$HARM,decreasing = TRUE),]
+plotme<-plotme[1:20,]
+
+plotme[order(plotme$HARM,decreasing = TRUE),]
+```
+  
+  
+### Question: Across the United States, which types of events had the greatest economic consequences?  
+  
+  The second question is similar to the first, in that we can use the same process and even some of the same variables to prepare the data for plotting.  
+  
+  Here, we will use the following variables, some we've seen before:  
+  1. EVTYPE  
+  2. PROPDMG  
+  3. CROPDMG  
+  
+(We make the assumption that CROPDMG is not a constituent of PROPDMG.)  
+  Similar to the first question, here we sum up two numeric vectors by event type. The data frame is referenced as db.  
+```{r}
+# Create the dataset that sums PROPDMG and CROPDMG by EVTYPE
+db<-aggregate(list(PROPDMG=sd$PROPDMG,CROPDMG=sd$CROPDMG),list(EVTYPE=sd$EVTYPE),sum)
+```
+  
+  We then add the PROPDMG variable to the CROPDMG variable into a new vector, TOTDMG.  
+```{r}
+db$TOTDMG<-db$PROPDMG + db$CROPDMG
+
+str(db)
+```
+  
+  For this second plot, we are interested only in the top 20 event types calculated by TOTDMG size.  
+```{r}  
+#Subset to top 20 largest damages
+dmplot<-db[order(db$TOTDMG,decreasing = TRUE),]
+dmplot<-dmplot[1:20,]
+
+dmplot[order(dmplot$TOTDMG, decreasing = TRUE),]
+```
+  
+  
+  
+## Results  
+We can now plot the the data for both questions and hopefully provide insight into the types of weather and storm events that are of concern in terms of population health and economic consequences:  
+  
+1. Across the United States, which types of weather or storm events were most harmful in respect to population health?
+  
+```{r}
+library(ggplot2)
+theme_set(theme_bw())
+
+# Draw plot
+
+ggplot(plotme, aes(x = factor(EVTYPE), y = HARM)) +
+  geom_dotplot(binaxis = "y", 
+               stackdir = "center")+  
+  theme(axis.text.x = element_text(angle=90, vjust = 0.5)) + 
+  labs(title="Major Weather Events, 1950-2011", 
+       subtitle="Top 20 Events Nationwide by Fatalities & Injuries",
+       x="Event Type",
+       y="Total Number of Fatalities and Injuries")
+```
+  
+  
+2. Across the United States, which types of events had the greatest economic consequences?  
+  
+  
+```{r}
+require(scales)
+
+# Draw plot
+ggplot(dmplot, aes(x = factor(EVTYPE), y = TOTDMG)) +
+  geom_dotplot(binaxis = "y", 
+               stackdir = "center")+  
+  theme(axis.text.x = element_text(angle=90, vjust = 0.5)) +   
+  labs(title="Major Weather Events, 1950-2011", 
+       subtitle="Top 20 Events Nationwide by Economic Consequences",
+       x="Event Type",
+       y="Total Property and Crop Damage") +
+       scale_y_continuous(labels=dollar_format(prefix="$"))
+        
+```
+    
